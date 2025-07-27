@@ -1,6 +1,2 @@
-streamlit
-selenium
-undetected-chromedriver
-openai
-python-docx
-requests
+openai>=1.0.0
+python-docx>=0.8.11
