@@ -1,64 +1,20 @@
-import streamlit as st
-import base64
-import time
-import datetime
-import undetected_chromedriver as uc
-from selenium.webdriver.chrome.options import Options
-from docx import Document
-from textwrap import dedent
-import openai
+#!/usr/bin/env python3
+import os
+import sys
 import json
-import re
+import argparse
+import subprocess
+import shutil
+from pathlib import Path
+from textwrap import dedent
+from docx import Document
+import openai
 
 # ---------------- CONFIG -----------------
-MODEL = "gpt-4o"  # or "gpt-4o-mini"
-openai.api_key = st.secrets.get("OPENAI_API_KEY", "")
+# You control the model from CLI; OPENAI_API_KEY must be in env.
 # -----------------------------------------
 
-# ---------- UTILITIES FOR DOCX PARSING ----------
-def generate_docx_from_advice(advice: str, output_path: str):
-    doc = Document()
-    doc.add_paragraph(advice)
-    doc.save(output_path)
-
-# ---------- SELENIUM (undetected-chromedriver) ----------
-def create_driver():
-    chrome_options = uc.ChromeOptions()
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--window-size=1920,1080")
-    return uc.Chrome(options=chrome_options)
-
-def get_url(url):
-    driver = create_driver()
-    try:
-        target_url = f"https://pagespeed.web.dev/analysis?url={url}"
-        st.write(f"Navigating to {target_url}")
-        driver.get(target_url)
-        time.sleep(15)  # Wait for PageSpeed Insights to load
-        new_url = driver.current_url.split('?')[0]
-        return new_url
-    finally:
-        driver.quit()
-
-def print_to_pdf(url: str, pdf_path: str = "output.pdf"):
-    driver = create_driver()
-    try:
-        driver.get(url)
-        wait_time = 70  # seconds
-        progress_bar = st.progress(0)
-        for i in range(wait_time):
-            time.sleep(1)
-            progress_bar.progress(int((i + 1) / wait_time * 100))
-        pdf = driver.execute_cdp_cmd("Page.printToPDF", {"printBackground": True})
-        with open(pdf_path, "wb") as f:
-            f.write(base64.b64decode(pdf['data']))
-        progress_bar.empty()
-    finally:
-        driver.quit()
-# ---------- LIGHTHOUSE JSON PARSING ----------
+# ---- YOUR ORIGINAL HELPERS (KEPT AS-IS, except tiny I/O glue) ----
 def pct(score):
     return None if score is None else int(round(score * 100))
 
@@ -66,37 +22,37 @@ def group_audits_by_category(lhr, category_id, group_ids):
     cat = lhr["categories"][category_id]
     audits = lhr["audits"]
     result = {gid: [] for gid in group_ids}
-
     for ref in cat["auditRefs"]:
         aid = ref["id"]
         a = audits[aid]
         gid = ref.get("group")
         if gid in result:
-            result[gid].append((aid, a.get("title"), a.get("displayValue"),
-                                a.get("score"), a.get("scoreDisplayMode"), a.get("description")))
+            result[gid].append((
+                aid,
+                a.get("title"),
+                a.get("displayValue"),
+                a.get("score"),
+                a.get("scoreDisplayMode"),
+                a.get("description"),
+            ))
     return result
 
 def list_passed_failed(lhr, category_id):
     cat = lhr["categories"][category_id]
     audits = lhr["audits"]
-    passed = []
-    failed = []
-    not_applicable = []
-
+    passed, failed, not_applicable = [], [], []
     for ref in cat["auditRefs"]:
         a = audits[ref["id"]]
         score = a.get("score")
         mode = a.get("scoreDisplayMode")
         title = a.get("title")
         display = a.get("displayValue")
-
         if mode == "notApplicable":
             not_applicable.append((title, display))
         elif score == 1:
             passed.append((title, display))
         elif score == 0:
             failed.append((title, display))
-
     return passed, failed, not_applicable
 
 def extract(lhr):
@@ -104,26 +60,25 @@ def extract(lhr):
     cats = lhr["categories"]
 
     perf = cats["performance"]
-    acc = cats["accessibility"]
-    bp = cats["best-practices"]
-    seo = cats["seo"]
+    acc  = cats["accessibility"]
+    bp   = cats["best-practices"]
+    seo  = cats["seo"]
 
     data = {
         "perf_score": pct(perf["score"]),
         "lcp": audits["largest-contentful-paint"]["displayValue"],
         "fcp": audits["first-contentful-paint"]["displayValue"],
         "cls": audits["cumulative-layout-shift"]["displayValue"],
-        "si": audits["speed-index"]["displayValue"],
+        "si":  audits["speed-index"]["displayValue"],
         "tbt": audits["total-blocking-time"]["displayValue"],
+
         "access_score": pct(acc["score"]),
         "bp_score": pct(bp["score"]),
         "seo_score": pct(seo["score"]),
     }
 
     perf_groups = group_audits_by_category(
-        lhr,
-        "performance",
-        ["diagnostics", "load-opportunities", "metrics"]
+        lhr, "performance", ["diagnostics", "load-opportunities", "metrics"]
     )
     data["perf_diagnostics"] = perf_groups.get("diagnostics", [])
     data["perf_insights"] = perf_groups.get("load-opportunities", [])
@@ -139,9 +94,7 @@ def extract(lhr):
     data["a11y_groups"] = acc_groups
 
     seo_groups = group_audits_by_category(
-        lhr,
-        "seo",
-        ["seo-crawl", "seo-content"]
+        lhr, "seo", ["seo-crawl", "seo-content"]
     )
     data["seo_groups"] = seo_groups
 
@@ -216,41 +169,104 @@ def render_prompt(url, d):
          {bullets(d['seo_failed'][:10])}
     """)
 
-# ---------- STREAMLIT UI ----------
-st.title("Shopify Site Performance Report Generator (undetected-chromedriver)")
+# ---- PDF maker via Chromium headless (no Selenium) ----
+def html_to_pdf(html_path: Path, pdf_path: Path):
+    # Try common chromium binaries
+    candidates = [
+        shutil.which("chromium"),
+        shutil.which("chromium-browser"),
+        shutil.which("google-chrome"),
+        shutil.which("google-chrome-stable"),
+        shutil.which("chrome"),
+    ]
+    bin_path = next((c for c in candidates if c), None)
+    if not bin_path:
+        raise RuntimeError("No Chromium/Chrome binary found in container.")
 
-url_input = st.text_input("Enter your site URL (e.g., https://example.com):")
-lighthouse_json = st.file_uploader("Upload Lighthouse JSON (optional)", type=["json"])
+    cmd = [
+        bin_path,
+        "--headless",
+        "--disable-gpu",
+        "--no-sandbox",
+        f"--print-to-pdf={pdf_path}",
+        str(html_path.resolve().as_uri()),
+    ]
+    subprocess.run(cmd, check=True)
 
-if st.button("Generate Report"):
-    if not url_input:
-        st.error("Please enter a URL")
-    else:
-        with st.spinner("Analyzing with PageSpeed Insights..."):
-            result_url = get_url(url_input)
+# ---- OpenAI call ----
+def get_ai_advice(model: str, url: str, lhr: dict) -> str:
+    data = extract(lhr)
+    prompt = render_prompt(url, data)
+    client = openai.OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+    resp = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": "You are a detailed web performance optimization expert."},
+            {"role": "user", "content": prompt}
+        ],
+    )
+    return resp.choices[0].message.content
 
-            mobile_pdf = f"mobile_{datetime.date.today()}.pdf"
-            desktop_pdf = f"desktop_{datetime.date.today()}.pdf"
-            print_to_pdf(f"{result_url}?form_factor=mobile", mobile_pdf)
-            print_to_pdf(f"{result_url}?form_factor=desktop", desktop_pdf)
+def write_docx(text: str, path: Path):
+    doc = Document()
+    doc.add_paragraph(text)
+    doc.save(path)
 
-        if lighthouse_json:
-            lhr = json.load(lighthouse_json)
-            data = extract(lhr)
-            prompt = render_prompt(url_input, data)
+# ---- Lighthouse runner ----
+def run_lighthouse(url: str, out_prefix: Path, strategy: str):
+    # Lighthouse will create out_prefix.report.json & out_prefix.report.html
+    cmd = [
+        "lighthouse",
+        url,
+        "--output=json",
+        "--output=html",
+        f"--output-path={out_prefix}",
+        "--chrome-flags=--headless --no-sandbox --disable-gpu",
+        f"--preset={strategy}",  # "desktop" or "mobile"
+    ]
+    subprocess.run(cmd, check=True)
 
-            st.info("Generating advice with AI...")
-            resp = openai.chat.completions.create(
-                model=MODEL,
-                messages=[
-                    {"role": "system", "content": "You are a detailed web performance optimization expert."},
-                    {"role": "user", "content": prompt}
-                ]
-            )
-            advice = resp.choices[0].message.content
-            docx_name = f"advice_{datetime.date.today()}.docx"
-            generate_docx_from_advice(advice, docx_name)
-            st.download_button("Download AI Advice (DOCX)", open(docx_name, "rb"), file_name=docx_name)
+def main():
+    parser = argparse.ArgumentParser(description="Run Lighthouse, create PDF, generate OpenAI advice DOCX.")
+    parser.add_argument("--url", required=True)
+    parser.add_argument("--model", default="gpt-4o")
+    parser.add_argument("--strategy", default="mobile", choices=["mobile", "desktop"])
+    parser.add_argument("--out-dir", default="out")
+    parser.add_argument("--prefix", default="report")
+    parser.add_argument("--skip-openai", action="store_true", help="Skip OpenAI call (no docx).")
+    args = parser.parse_args()
 
-        st.download_button("Download Mobile Report (PDF)", open(mobile_pdf, "rb"), file_name=mobile_pdf)
-        st.download_button("Download Desktop Report (PDF)", open(desktop_pdf, "rb"), file_name=desktop_pdf)
+    if "OPENAI_API_KEY" not in os.environ and not args.skip_openai:
+        sys.exit("OPENAI_API_KEY env var missing.")
+
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    out_prefix = out_dir / args.prefix
+    print(f"Running Lighthouse for {args.url} ({args.strategy})...")
+    run_lighthouse(args.url, out_prefix, args.strategy)
+
+    json_path = Path(f"{out_prefix}.report.json")
+    html_path = Path(f"{out_prefix}.report.html")
+    pdf_path  = Path(f"{out_prefix}.report.pdf")
+    if not json_path.exists() or not html_path.exists():
+        sys.exit("Lighthouse did not output expected files.")
+
+    print("Converting HTML to PDF...")
+    html_to_pdf(html_path, pdf_path)
+    print(f"PDF written to: {pdf_path}")
+
+    if not args.skip_openai:
+        print("Generating OpenAI advice (DOCX)...")
+        with json_path.open(encoding="utf-8") as f:
+            lhr = json.load(f)["lighthouseResult"]
+
+        advice = get_ai_advice(args.model, args.url, lhr)
+        docx_path = out_dir / "advice.docx"
+        write_docx(advice, docx_path)
+        print(f"DOCX written to: {docx_path}")
+
+    print("Done.")
+
+if __name__ == "__main__":
+    main()
