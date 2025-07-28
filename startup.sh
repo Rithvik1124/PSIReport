@@ -47,4 +47,4 @@ fi
 
 # 4) Launch Streamlit
 echo "Starting Streamlit app..."
-streamlit run streamlit_app.py --server.port 8501 --server.address 0.0.0.0
+streamlit run streamlit_app.py -- --url "$URL" --strategy "$STRATEGY"
