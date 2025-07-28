@@ -7,9 +7,9 @@ app = FastAPI()
 # Add CORS *before* any routes
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Or use your frontend domain for security
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # Or ["POST", "OPTIONS"]
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
@@ -29,7 +29,6 @@ import os
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-app = FastAPI()
 
 class URLRequest(BaseModel):
     url: str
