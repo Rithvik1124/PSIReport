@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-URL="${URL:-https://example.com}"
+URL="${URL:-https://turquoisemoose.com}"
 STRATEGY="${STRATEGY:-desktop}"
 MODEL="${MODEL:-gpt-4o}"
 OUT_DIR="${OUT_DIR:-out}"
