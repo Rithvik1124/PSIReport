@@ -3,3 +3,4 @@ uvicorn
 selenium
 openai
 python-multipart
+python-docx
