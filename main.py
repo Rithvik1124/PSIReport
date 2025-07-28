@@ -51,9 +51,9 @@ def setup_driver(mobile=False):
 def extract_data(driver):
     selectors = {
         'Performance Score': '#performance .lh-exp-gauge__percentage',
-        'Accessibility':'#accessibility .lh-exp-gauge__percentage',
-        'SEO':'#seo .lh-exp-gauge__percentage',
-        'BP':'#best-practices .lh-exp-gauge__percentage',
+        'Accessibility':'#accessibility .lh-gauge__percentage',
+        'SEO':'#seo .lh-gauge__percentage',
+        'BP':'#best-practices .lh-gauge__percentage',
         'LCP': '#largest-contentful-paint',
         'CLS': '#cumulative-layout-shift',
         'SI': '#speed-index',
