@@ -1,20 +1,14 @@
-#!/usr/bin/env python3
 import os
-import sys
 import json
-import argparse
 import subprocess
 import shutil
 from pathlib import Path
-from textwrap import dedent
+
+import streamlit as st
 from docx import Document
 import openai
 
-# ---------------- CONFIG -----------------
-# You control the model from CLI; OPENAI_API_KEY must be in env.
-# -----------------------------------------
-
-# ---- YOUR ORIGINAL HELPERS (KEPT AS-IS, except tiny I/O glue) ----
+# ----------- Helpers --------------
 def pct(score):
     return None if score is None else int(round(score * 100))
 
@@ -27,14 +21,8 @@ def group_audits_by_category(lhr, category_id, group_ids):
         a = audits[aid]
         gid = ref.get("group")
         if gid in result:
-            result[gid].append((
-                aid,
-                a.get("title"),
-                a.get("displayValue"),
-                a.get("score"),
-                a.get("scoreDisplayMode"),
-                a.get("description"),
-            ))
+            result[gid].append((aid, a.get("title"), a.get("displayValue"), a.get("score"),
+                                a.get("scoreDisplayMode"), a.get("description")))
     return result
 
 def list_passed_failed(lhr, category_id):
@@ -71,39 +59,21 @@ def extract(lhr):
         "cls": audits["cumulative-layout-shift"]["displayValue"],
         "si":  audits["speed-index"]["displayValue"],
         "tbt": audits["total-blocking-time"]["displayValue"],
-
         "access_score": pct(acc["score"]),
         "bp_score": pct(bp["score"]),
         "seo_score": pct(seo["score"]),
     }
 
-    perf_groups = group_audits_by_category(
-        lhr, "performance", ["diagnostics", "load-opportunities", "metrics"]
-    )
-    data["perf_diagnostics"] = perf_groups.get("diagnostics", [])
-    data["perf_insights"] = perf_groups.get("load-opportunities", [])
+    data["perf_diagnostics"] = group_audits_by_category(lhr, "performance", ["diagnostics", "load-opportunities", "metrics"]).get("diagnostics", [])
+    data["perf_insights"] = group_audits_by_category(lhr, "performance", ["diagnostics", "load-opportunities", "metrics"]).get("load-opportunities", [])
 
-    acc_groups = group_audits_by_category(
-        lhr,
-        "accessibility",
-        [
-            "a11y-names-labels", "a11y-best-practices",
-            "a11y-color-contrast", "a11y-aria", "a11y-navigation"
-        ]
-    )
-    data["a11y_groups"] = acc_groups
-
-    seo_groups = group_audits_by_category(
-        lhr, "seo", ["seo-crawl", "seo-content"]
-    )
-    data["seo_groups"] = seo_groups
-
-    bp_groups = group_audits_by_category(
-        lhr,
-        "best-practices",
-        ["best-practices-general", "best-practices-ux", "best-practices-trust-safety"]
-    )
-    data["bp_groups"] = bp_groups
+    data["a11y_groups"] = group_audits_by_category(lhr, "accessibility", [
+        "a11y-names-labels", "a11y-best-practices", "a11y-color-contrast", "a11y-aria", "a11y-navigation"
+    ])
+    data["seo_groups"] = group_audits_by_category(lhr, "seo", ["seo-crawl", "seo-content"])
+    data["bp_groups"] = group_audits_by_category(lhr, "best-practices", [
+        "best-practices-general", "best-practices-ux", "best-practices-trust-safety"
+    ])
 
     data["perf_passed"], data["perf_failed"], _ = list_passed_failed(lhr, "performance")
     data["access_passed"], data["access_failed"], _ = list_passed_failed(lhr, "accessibility")
@@ -118,86 +88,66 @@ def render_prompt(url, d):
             return "None"
         return "\n".join([f"- {title} ({display or ''})" for (title, display) in items])
 
-    return dedent(f"""
-    Act like an expert web performance consultant. I run a Shopify site and I'm a novice.
-    I will paste the Lighthouse JSON-derived results below. Give me a structured, step-by-step improvement plan:
-    - Split by Performance, Accessibility, Best Practices, SEO
-    - Explain what each issue means in plain English
-    - Why it matters
-    - Exactly how to fix (include code/config/server header examples)
-    - Don't assume I know SEO or Core Web Vitals
+    return f"""
+Act like an expert web performance consultant. I run a Shopify site and I'm a novice.
+Give me a structured, step-by-step improvement plan:
+- Split by Performance, Accessibility, Best Practices, SEO
+- Explain what each issue means in plain English
+- Why it matters
+- Exactly how to fix it (with code/config/server header examples)
+- Don't assume I know SEO or Core Web Vitals
 
-    **Page URL:** {url}
+**Page URL:** {url}
 
-    ---
-    1) **Performance**
-       - **Performance Score (Mobile):** {d['perf_score']}
-       - **LCP:** {d['lcp']}
-       - **FCP:** {d['fcp']}
-       - **CLS:** {d['cls']}
-       - **Speed Index:** {d['si']}
-       - **TBT:** {d['tbt']}
-       - **Diagnostics (top items):**
-         {bullets([(t, dv) for _, t, dv, *_ in d['perf_diagnostics']][:10])}
-       - **Insights / Opportunities (top items):**
-         {bullets([(t, dv) for _, t, dv, *_ in d['perf_insights']][:10])}
-       - **Passed Audits (sample):**
-         {bullets(d['perf_passed'][:10])}
+---
+1) **Performance**
+   - **Performance Score (Mobile):** {d['perf_score']}
+   - **LCP:** {d['lcp']}
+   - **FCP:** {d['fcp']}
+   - **CLS:** {d['cls']}
+   - **Speed Index:** {d['si']}
+   - **TBT:** {d['tbt']}
+   - **Diagnostics (top items):**
+     {bullets([(t, dv) for _, t, dv, *_ in d['perf_diagnostics']][:10])}
+   - **Insights / Opportunities (top items):**
+     {bullets([(t, dv) for _, t, dv, *_ in d['perf_insights']][:10])}
+   - **Passed Audits (sample):**
+     {bullets(d['perf_passed'][:10])}
 
-    ---
-    2) **Accessibility**
-       - **Score:** {d['access_score']}
-       - **Passed Audits (sample):**
-         {bullets(d['access_passed'][:10])}
-       - **Failed Audits (sample):**
-         {bullets(d['access_failed'][:10])}
+---
+2) **Accessibility**
+   - **Score:** {d['access_score']}
+   - **Passed Audits (sample):**
+     {bullets(d['access_passed'][:10])}
+   - **Failed Audits (sample):**
+     {bullets(d['access_failed'][:10])}
 
-    ---
-    3) **Best Practices**
-       - **Score:** {d['bp_score']}
-       - **Passed Audits (sample):**
-         {bullets(d['bp_passed'][:10])}
-       - **Failed Audits (sample):**
-         {bullets(d['bp_failed'][:10])}
+---
+3) **Best Practices**
+   - **Score:** {d['bp_score']}
+   - **Passed Audits (sample):**
+     {bullets(d['bp_passed'][:10])}
+   - **Failed Audits (sample):**
+     {bullets(d['bp_failed'][:10])}
 
-    ---
-    4) **SEO**
-       - **Score:** {d['seo_score']}
-       - **Passed Audits (sample):**
-         {bullets(d['seo_passed'][:10])}
-       - **Failed Audits (sample):**
-         {bullets(d['seo_failed'][:10])}
-    """)
+---
+4) **SEO**
+   - **Score:** {d['seo_score']}
+   - **Passed Audits (sample):**
+     {bullets(d['seo_passed'][:10])}
+   - **Failed Audits (sample):**
+     {bullets(d['seo_failed'][:10])}
+"""
 
-# ---- PDF maker via Chromium headless (no Selenium) ----
-def html_to_pdf(html_path: Path, pdf_path: Path):
-    # Try common chromium binaries
-    candidates = [
-        shutil.which("chromium"),
-        shutil.which("chromium-browser"),
-        shutil.which("google-chrome"),
-        shutil.which("google-chrome-stable"),
-        shutil.which("chrome"),
-    ]
-    bin_path = next((c for c in candidates if c), None)
-    if not bin_path:
-        raise RuntimeError("No Chromium/Chrome binary found in container.")
-
-    cmd = [
-        bin_path,
-        "--headless",
-        "--disable-gpu",
-        "--no-sandbox",
-        f"--print-to-pdf={pdf_path}",
-        str(html_path.resolve().as_uri()),
-    ]
-    subprocess.run(cmd, check=True)
-
-# ---- OpenAI call ----
 def get_ai_advice(model: str, url: str, lhr: dict) -> str:
     data = extract(lhr)
     prompt = render_prompt(url, data)
-    client = openai.OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+    api_key = os.getenv("OPENAI_API_KEY", None)
+    if not api_key:
+        st.warning("OPENAI_API_KEY not set. Skipping AI advice.")
+        return "No API key configured."
+
+    client = openai.OpenAI(api_key=api_key)
     resp = client.chat.completions.create(
         model=model,
         messages=[
@@ -209,12 +159,11 @@ def get_ai_advice(model: str, url: str, lhr: dict) -> str:
 
 def write_docx(text: str, path: Path):
     doc = Document()
-    doc.add_paragraph(text)
+    for line in text.split("\n"):
+        doc.add_paragraph(line)
     doc.save(path)
 
-# ---- Lighthouse runner ----
 def run_lighthouse(url: str, out_prefix: Path, strategy: str):
-    # Lighthouse will create out_prefix.report.json & out_prefix.report.html
     cmd = [
         "lighthouse",
         url,
@@ -222,51 +171,47 @@ def run_lighthouse(url: str, out_prefix: Path, strategy: str):
         "--output=html",
         f"--output-path={out_prefix}",
         "--chrome-flags=--headless --no-sandbox --disable-gpu",
-        f"--preset={strategy}",  # "desktop" or "mobile"
+        f"--preset={strategy}",
     ]
     subprocess.run(cmd, check=True)
 
-def main():
-    parser = argparse.ArgumentParser(description="Run Lighthouse, create PDF, generate OpenAI advice DOCX.")
-    parser.add_argument("--url", required=True)
-    parser.add_argument("--model", default="gpt-4o")
-    parser.add_argument("--strategy", default="mobile", choices=["mobile", "desktop"])
-    parser.add_argument("--out-dir", default="out")
-    parser.add_argument("--prefix", default="report")
-    parser.add_argument("--skip-openai", action="store_true", help="Skip OpenAI call (no docx).")
-    args = parser.parse_args()
+# ----------- Streamlit UI --------------
+st.set_page_config(page_title="Lighthouse + AI Audit", layout="wide")
+st.title("📊 Lighthouse + OpenAI Report Generator")
 
-    if "OPENAI_API_KEY" not in os.environ and not args.skip_openai:
-        sys.exit("OPENAI_API_KEY env var missing.")
+url = st.text_input("Enter website URL", "https://example.com")
+strategy = st.selectbox("Audit Strategy", ["mobile", "desktop"])
+model = st.selectbox("OpenAI Model", ["gpt-4o", "gpt-4", "gpt-3.5-turbo"])
+run = st.button("🚀 Run Audit and Generate Report")
 
-    out_dir = Path(args.out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+if run:
+    out_dir = Path("out")
+    out_dir.mkdir(exist_ok=True)
+    out_prefix = out_dir / "report"
 
-    out_prefix = out_dir / args.prefix
-    print(f"Running Lighthouse for {args.url} ({args.strategy})...")
-    run_lighthouse(args.url, out_prefix, args.strategy)
+    with st.spinner("Running Lighthouse..."):
+        try:
+            run_lighthouse(url, out_prefix, strategy)
+        except Exception as e:
+            st.error(f"Lighthouse failed: {e}")
+            st.stop()
 
     json_path = Path(f"{out_prefix}.report.json")
-    html_path = Path(f"{out_prefix}.report.html")
-    pdf_path  = Path(f"{out_prefix}.report.pdf")
-    if not json_path.exists() or not html_path.exists():
-        sys.exit("Lighthouse did not output expected files.")
+    if not json_path.exists():
+        st.error("Audit JSON not found.")
+        st.stop()
 
-    print("Converting HTML to PDF...")
-    html_to_pdf(html_path, pdf_path)
-    print(f"PDF written to: {pdf_path}")
+    with json_path.open(encoding="utf-8") as f:
+        lhr = json.load(f)["lighthouseResult"]
 
-    if not args.skip_openai:
-        print("Generating OpenAI advice (DOCX)...")
-        with json_path.open(encoding="utf-8") as f:
-            lhr = json.load(f)["lighthouseResult"]
+    st.success("✅ Lighthouse audit completed.")
 
-        advice = get_ai_advice(args.model, args.url, lhr)
-        docx_path = out_dir / "advice.docx"
-        write_docx(advice, docx_path)
-        print(f"DOCX written to: {docx_path}")
-
-    print("Done.")
-
-if __name__ == "__main__":
-    main()
+    if os.getenv("OPENAI_API_KEY"):
+        with st.spinner("Calling OpenAI for step-by-step advice..."):
+            advice = get_ai_advice(model, url, lhr)
+            docx_path = out_dir / "advice.docx"
+            write_docx(advice, docx_path)
+            with open(docx_path, "rb") as f:
+                st.download_button("📥 Download AI Advice DOCX", f, file_name="ai_advice.docx")
+    else:
+        st.warning("No OPENAI_API_KEY found in environment. Skipping AI report.")
