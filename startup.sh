@@ -14,6 +14,9 @@ echo "Model: $MODEL"
 echo "Output Dir: $OUT_DIR"
 echo "========================================="
 
+# Ensure output directory exists
+mkdir -p "$OUT_DIR"
+
 # 1) Run Lighthouse
 lighthouse "$URL" \
     --output=json \
