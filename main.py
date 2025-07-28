@@ -110,6 +110,7 @@ Explain what’s wrong and exactly how to fix it.
 @app.post("/analyze")
 @app.post("/analyze")
 async def analyze(request: URLRequest):
+    print("🔐 ENV API Key loaded:", os.getenv("OPENAI_API_KEY"))
     print("🌐 Received URL:", request.url)
     full_url = f"https://pagespeed.web.dev/analysis?url={request.url}"
 
