@@ -12,7 +12,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -20,6 +20,7 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from docx import Document
 import openai
 import time
 import base64
@@ -107,6 +108,7 @@ Explain what’s wrong and exactly how to fix it.
         return "Error generating advice from OpenAI."
 
 @app.post("/analyze")
+@app.post("/analyze")
 async def analyze(request: URLRequest):
     print("🌐 Received URL:", request.url)
     full_url = f"https://pagespeed.web.dev/analysis?url={request.url}"
@@ -128,13 +130,27 @@ async def analyze(request: URLRequest):
         print("🤖 Getting AI advice...")
         advice = generate_advice(request.url, metrics)
 
-        return {
-            "url": request.url,
-            "metrics": metrics,
-            "advice": advice,
-            "screenshot_desktop": screenshot_desktop,
-            "screenshot_mobile": screenshot_mobile
-        }
+        # 📄 Generate .docx
+        doc = Document()
+        doc.add_heading("PSI Optimization Report", 0)
+        doc.add_paragraph(f"URL: {request.url}")
+        doc.add_paragraph("\nMetrics:")
+
+        for key, value in metrics.items():
+            doc.add_paragraph(f"{key}: {value}")
+
+        doc.add_paragraph("\nAI Optimization Advice:")
+        doc.add_paragraph(advice)
+
+        doc_path = "/tmp/psi_advice.docx"
+        doc.save(doc_path)
+
+        print("✅ Returning docx file")
+        return FileResponse(
+            path=doc_path,
+            filename="psi_advice.docx",
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
 
     except Exception as e:
         print("🔥 CRITICAL ERROR:", e)
