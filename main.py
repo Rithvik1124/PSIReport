@@ -21,14 +21,14 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from docx import Document
-import openai
+from openai import OpenAI
 import time
 import base64
 import os
 
 
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
 class URLRequest(BaseModel):
@@ -94,8 +94,9 @@ Audit Data:
 Give a detailed, plain-English optimization plan for Performance, Accessibility, SEO, and Best Practices.
 Explain what’s wrong and exactly how to fix it.
 """
+
     try:
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-4o",
             messages=[
                 {"role": "system", "content": "You are a helpful web performance optimization expert."},
@@ -103,6 +104,7 @@ Explain what’s wrong and exactly how to fix it.
             ]
         )
         return response.choices[0].message.content
+
     except Exception as e:
         print("❌ OpenAI error:", e)
         return "Error generating advice from OpenAI."
@@ -110,7 +112,6 @@ Explain what’s wrong and exactly how to fix it.
 @app.post("/analyze")
 @app.post("/analyze")
 async def analyze(request: URLRequest):
-    print("🔐 ENV API Key loaded:", os.getenv("OPENAI_API_KEY"))
     print("🌐 Received URL:", request.url)
     full_url = f"https://pagespeed.web.dev/analysis?url={request.url}"
 
