@@ -44,43 +44,59 @@ def list_passed_failed(lhr, category_id):
     return passed, failed, not_applicable
 
 def extract(lhr):
-    audits = lhr["audits"]
-    cats = lhr["categories"]
+    audits = lhr.get("audits", {})
+    cats = lhr.get("categories", {})
 
-    perf = cats["performance"]
-    acc  = cats["accessibility"]
-    bp   = cats["best-practices"]
-    seo  = cats["seo"]
+    def safe_display_value(audit_key):
+        return audits.get(audit_key, {}).get("displayValue", "N/A")
+
+    def safe_score(category_key):
+        return pct(cats.get(category_key, {}).get("score"))
 
     data = {
-        "perf_score": pct(perf["score"]),
-        "lcp": audits["largest-contentful-paint"]["displayValue"],
-        "fcp": audits["first-contentful-paint"]["displayValue"],
-        "cls": audits["cumulative-layout-shift"]["displayValue"],
-        "si":  audits["speed-index"]["displayValue"],
-        "tbt": audits["total-blocking-time"]["displayValue"],
-        "access_score": pct(acc["score"]),
-        "bp_score": pct(bp["score"]),
-        "seo_score": pct(seo["score"]),
+        "perf_score": safe_score("performance"),
+        "lcp": safe_display_value("largest-contentful-paint"),
+        "fcp": safe_display_value("first-contentful-paint"),
+        "cls": safe_display_value("cumulative-layout-shift"),
+        "si":  safe_display_value("speed-index"),
+        "tbt": safe_display_value("total-blocking-time"),
+        "access_score": safe_score("accessibility"),
+        "bp_score": safe_score("best-practices"),
+        "seo_score": safe_score("seo"),
     }
 
-    data["perf_diagnostics"] = group_audits_by_category(lhr, "performance", ["diagnostics", "load-opportunities", "metrics"]).get("diagnostics", [])
-    data["perf_insights"] = group_audits_by_category(lhr, "performance", ["diagnostics", "load-opportunities", "metrics"]).get("load-opportunities", [])
+    # Safely group audits
+    def safe_group(category, groups):
+        try:
+            return group_audits_by_category(lhr, category, groups)
+        except Exception:
+            return {gid: [] for gid in groups}
 
-    data["a11y_groups"] = group_audits_by_category(lhr, "accessibility", [
+    data["perf_diagnostics"] = safe_group("performance", ["diagnostics", "load-opportunities", "metrics"]).get("diagnostics", [])
+    data["perf_insights"] = safe_group("performance", ["diagnostics", "load-opportunities", "metrics"]).get("load-opportunities", [])
+
+    data["a11y_groups"] = safe_group("accessibility", [
         "a11y-names-labels", "a11y-best-practices", "a11y-color-contrast", "a11y-aria", "a11y-navigation"
     ])
-    data["seo_groups"] = group_audits_by_category(lhr, "seo", ["seo-crawl", "seo-content"])
-    data["bp_groups"] = group_audits_by_category(lhr, "best-practices", [
+    data["seo_groups"] = safe_group("seo", ["seo-crawl", "seo-content"])
+    data["bp_groups"] = safe_group("best-practices", [
         "best-practices-general", "best-practices-ux", "best-practices-trust-safety"
     ])
 
-    data["perf_passed"], data["perf_failed"], _ = list_passed_failed(lhr, "performance")
-    data["access_passed"], data["access_failed"], _ = list_passed_failed(lhr, "accessibility")
-    data["bp_passed"], data["bp_failed"], _ = list_passed_failed(lhr, "best-practices")
-    data["seo_passed"], data["seo_failed"], _ = list_passed_failed(lhr, "seo")
+    # Safe passed/failed grouping
+    def safe_list(category):
+        try:
+            return list_passed_failed(lhr, category)
+        except Exception:
+            return [], [], []
+
+    data["perf_passed"], data["perf_failed"], _ = safe_list("performance")
+    data["access_passed"], data["access_failed"], _ = safe_list("accessibility")
+    data["bp_passed"], data["bp_failed"], _ = safe_list("best-practices")
+    data["seo_passed"], data["seo_failed"], _ = safe_list("seo")
 
     return data
+
 
 def render_prompt(url, d):
     def bullets(items):
