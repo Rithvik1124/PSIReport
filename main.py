@@ -16,11 +16,12 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Or restrict to ["https://your-react-domain.com"]
+    allow_origins=["*"],  # Or ["https://your-frontend-domain.com"]
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],  # Important: allows POST, OPTIONS, etc.
+    allow_headers=["*"],  # Allows custom headers like Content-Type
 )
+
 
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -140,3 +141,6 @@ async def analyze(request: URLRequest):
     finally:
         desktop_driver.quit()
         mobile_driver.quit()
+@app.get('/')
+def read_root():
+    return {"message": "API is live"}
