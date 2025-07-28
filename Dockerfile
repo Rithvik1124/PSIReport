@@ -1,24 +1,29 @@
-# Base Python (you asked for Lighthouse CLI, so we also add Node + Chromium here)
 FROM python:3.11-slim
 
-# Install system deps: node, chromium, fonts
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
-    nodejs npm chromium chromium-common chromium-driver fonts-liberation \
+    nodejs npm \
+    chromium chromium-common chromium-driver \
+    fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Lighthouse CLI
+# Install Lighthouse globally
 RUN npm install -g lighthouse@11
 
-# Workdir
+# Set work directory
 WORKDIR /app
 
-# Python deps
-COPY requirements.txt .
+# Copy files
+COPY . .
+
+# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Add code
-COPY run.py .
+# Set environment variable for Streamlit to listen correctly on Railway
+ENV STREAMLIT_SERVER_PORT=8000
+ENV STREAMLIT_SERVER_ADDRESS=0.0.0.0
 
-# Default command example (override with docker run args)
-# You WILL override --url at runtime.
-CMD ["python", "run.py", "--url", "https://example.com", "--strategy", "mobile"]
+EXPOSE 8000
+
+# Start the Streamlit app
+CMD ["streamlit", "run", "streamlit_app.py", "--server.port=8000", "--server.address=0.0.0.0"]
