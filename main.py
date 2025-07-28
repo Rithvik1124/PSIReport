@@ -18,7 +18,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://psireportui.onrender.com/"], 
     allow_credentials=True,
-    allow_methods=["*"],  # Important: allows POST, OPTIONS, etc.
+    allow_methods=["POST","OPTIONS"],  # Important: allows POST, OPTIONS, etc.
     allow_headers=["*"],  # Allows custom headers like Content-Type
 )
 
