@@ -1,4 +1,18 @@
 from fastapi import FastAPI
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+app = FastAPI()
+
+# Add CORS *before* any routes
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Or use your frontend domain for security
+    allow_credentials=True,
+    allow_methods=["*"],  # Or ["POST", "OPTIONS"]
+    allow_headers=["*"],
+)
+
 from pydantic import BaseModel
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -10,17 +24,6 @@ import openai
 import time
 import base64
 import os
-from fastapi.middleware.cors import CORSMiddleware
-
-app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["https://psireportui.onrender.com/"], 
-    allow_credentials=True,
-    allow_methods=["POST","OPTIONS"],  # Important: allows POST, OPTIONS, etc.
-    allow_headers=["*"],  # Allows custom headers like Content-Type
-)
 
 
 
