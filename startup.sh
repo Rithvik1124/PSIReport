@@ -41,12 +41,7 @@ if [[ -z "$OPENAI_API_KEY" ]]; then
   echo "OPENAI_API_KEY is not set. Skipping OpenAI advice generation."
 else
   echo "Generating OpenAI advice..."
-  python run.py \
-    --url "$URL" \
-    --model "$MODEL" \
-    --strategy "$STRATEGY" \
-    --out-dir "$OUT_DIR" \
-    --prefix "$PREFIX"
+ 
 fi
 
 # 4) Launch Streamlit
