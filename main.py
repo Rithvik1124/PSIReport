@@ -144,3 +144,6 @@ async def analyze(request: URLRequest):
 @app.get('/')
 def read_root():
     return {"message": "API is live"}
+@app.get("/test")
+def ping():
+    return {"ping": "pong"}
