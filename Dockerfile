@@ -13,17 +13,20 @@ RUN npm install -g lighthouse@11
 # Set work directory
 WORKDIR /app
 
-# Copy files
+# Copy project files
 COPY . .
 
-# Install Python dependencies
+# Install Python packages
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Set environment variable for Streamlit to listen correctly on Railway
-ENV STREAMLIT_SERVER_PORT=8000
+# Ensure startup.sh is executable
+RUN chmod +x startup.sh
+
+# Use Railway's port env variable for Streamlit
 ENV STREAMLIT_SERVER_ADDRESS=0.0.0.0
 
+# Expose the port (Railway uses $PORT)
 EXPOSE 8000
 
-# Start the Streamlit app
-CMD ["streamlit", "run", "streamlit_app.py", "--server.port=8000", "--server.address=0.0.0.0"]
+# Start everything via startup script
+CMD ["bash", "startup.sh"]
