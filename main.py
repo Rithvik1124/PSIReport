@@ -20,9 +20,10 @@ class URLRequest(BaseModel):
 
 def setup_driver(mobile=False):
     chrome_options = Options()
-    chrome_options.add_argument("--headless=new")
+    chrome_options.add_argument("--headless=new")  # or "--headless"
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")  # 👈 Railway-specific
     chrome_options.binary_location = "/usr/bin/chromium"
 
     if mobile:
@@ -52,6 +53,7 @@ def extract_data(driver):
             data[label] = el.text
         except Exception as e:
             data[label] = f"Error: {str(e)}"
+            print(f"⚠️ Could not extract {label}: {e}")
     return data
 
 def screenshot_base64(driver):
@@ -76,40 +78,52 @@ Audit Data:
 Give a detailed, plain-English optimization plan for Performance, Accessibility, SEO, and Best Practices.
 Explain what’s wrong and exactly how to fix it.
 """
-    response = openai.ChatCompletion.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": "You are a helpful web performance optimization expert."},
-            {"role": "user", "content": prompt}
-        ]
-    )
-    return response.choices[0].message.content
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "You are a helpful web performance optimization expert."},
+                {"role": "user", "content": prompt}
+            ]
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        print("❌ OpenAI error:", e)
+        return "Error generating advice from OpenAI."
 
 @app.post("/analyze")
 async def analyze(request: URLRequest):
-    url = request.url
-    full_url = f"https://pagespeed.web.dev/analysis?url={url}"
-
-    desktop_driver = setup_driver(mobile=False)
-    mobile_driver = setup_driver(mobile=True)
+    print("🌐 Received URL:", request.url)
+    full_url = f"https://pagespeed.web.dev/analysis?url={request.url}"
 
     try:
+        desktop_driver = setup_driver(mobile=False)
+        mobile_driver = setup_driver(mobile=True)
+
+        print("🚀 Loading PSI...")
         desktop_driver.get(full_url)
         mobile_driver.get(full_url)
-        time.sleep(25)  # crude wait for PSI to finish rendering
+        time.sleep(25)  # crude wait for PSI load
 
+        print("📊 Extracting metrics...")
         metrics = extract_data(desktop_driver)
         screenshot_desktop = screenshot_base64(desktop_driver)
         screenshot_mobile = screenshot_base64(mobile_driver)
-        advice = generate_advice(url, metrics)
+
+        print("🤖 Getting AI advice...")
+        advice = generate_advice(request.url, metrics)
 
         return {
-            "url": url,
+            "url": request.url,
             "metrics": metrics,
             "advice": advice,
             "screenshot_desktop": screenshot_desktop,
             "screenshot_mobile": screenshot_mobile
         }
+
+    except Exception as e:
+        print("🔥 CRITICAL ERROR:", e)
+        return {"error": str(e)}
 
     finally:
         desktop_driver.quit()
