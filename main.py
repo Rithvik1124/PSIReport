@@ -50,7 +50,10 @@ def setup_driver(mobile=False):
 
 def extract_data(driver):
     selectors = {
-        'Performance Score': '.lh-exp-gauge__percentage',
+        'Performance Score': '#performance .lh-exp-gauge__percentage',
+        'Accessibility':'#accessibility .lh-exp-gauge__percentage',
+        'SEO':'#seo .lh-exp-gauge__percentage',
+        'BP':'#best-practices .lh-exp-gauge__percentage',
         'LCP': '#largest-contentful-paint',
         'CLS': '#cumulative-layout-shift',
         'SI': '#speed-index',
@@ -83,6 +86,9 @@ URL: {url}
 
 Audit Data:
 - Performance Score: {data.get('Performance Score')}
+- Accessibility: {data.get('Accessibility')}
+- Best Practices: {data.get('BP')}
+- SEO: {data.get('SEO')}
 - LCP: {data.get('LCP')}
 - CLS: {data.get('CLS')}
 - Speed Index: {data.get('SI')}
