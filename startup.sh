@@ -2,7 +2,7 @@
 set -e
 
 URL="${URL:-https://example.com}"
-STRATEGY="${STRATEGY:-mobile}"
+STRATEGY="${STRATEGY:-desktop}"
 MODEL="${MODEL:-gpt-4o}"
 OUT_DIR="${OUT_DIR:-out}"
 PREFIX="${PREFIX:-report}"
