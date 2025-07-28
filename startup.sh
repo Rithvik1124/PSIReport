@@ -23,7 +23,8 @@ lighthouse "$URL" \
     --output=html \
     --output-path="$OUT_DIR/$PREFIX" \
     --chrome-flags="--headless --no-sandbox --disable-gpu" \
-    --preset="$STRATEGY"
+    --preset="$STRATEGY"\
+    --timeout=12000
 
 # 2) Convert HTML to PDF
 echo "Converting HTML to PDF..."
