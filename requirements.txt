@@ -1,6 +1,6 @@
 fastapi
 uvicorn
 selenium
-openai
+openai==0.28
 python-multipart
 python-docx
