@@ -1,32 +1,25 @@
 FROM python:3.11-slim
 
-# Install system dependencies
+# Install dependencies
 RUN apt-get update && apt-get install -y \
-    nodejs npm \
-    chromium chromium-common chromium-driver \
+    chromium \
+    chromium-driver \
+    wget \
+    unzip \
     fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Lighthouse globally
-RUN npm install -g lighthouse@11
+ENV CHROME_BIN=/usr/bin/chromium
 
-# Set work directory
+# Set working directory
 WORKDIR /app
-
-# Copy project files
 COPY . .
 
-# Install Python packages
+# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Ensure startup.sh is executable
-RUN chmod +x startup.sh
-
-# Use Railway's port env variable for Streamlit
-ENV STREAMLIT_SERVER_ADDRESS=0.0.0.0
-
-# Expose the port (Railway uses $PORT)
+# Port for Railway
 EXPOSE 8000
 
-# Start everything via startup script
-CMD ["bash", "startup.sh"]
+# Run the app
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
