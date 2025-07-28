@@ -110,7 +110,6 @@ Explain what’s wrong and exactly how to fix it.
         return "Error generating advice from OpenAI."
 
 @app.post("/analyze")
-@app.post("/analyze")
 async def analyze(request: URLRequest):
     print("🌐 Received URL:", request.url)
     full_url = f"https://pagespeed.web.dev/analysis?url={request.url}"
