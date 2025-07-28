@@ -10,6 +10,18 @@ import openai
 import time
 import base64
 import os
+from fastapi.middleware.cors import CORSMiddleware
+
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Or restrict to ["https://your-react-domain.com"]
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
