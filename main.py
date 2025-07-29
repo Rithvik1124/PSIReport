@@ -21,6 +21,10 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from docx import Document
+import re
+import datetime
+from docx.enum.text import WD_COLOR_INDEX
+
 from openai import OpenAI
 import time
 import base64
@@ -114,6 +118,68 @@ Explain what’s wrong and exactly how to fix it.
     except Exception as e:
         print("❌ OpenAI error:", e)
         return "Error generating advice from OpenAI."
+def get_name(url):
+    name = url.split('https://')[1].split('.')
+    name = name[0] + str(datetime.date.today())
+    return name
+
+def parse_markdown_with_code(doc: Document, markdown: str):
+    code_blocks = []
+    def replacer(match):
+        code_blocks.append(match.group(1).strip())
+        return f"[[CODE_BLOCK_{len(code_blocks) - 1}]]"
+
+    markdown = re.sub(r"```(?:\w*\n)?(.*?)```", replacer, markdown, flags=re.DOTALL)
+
+    for line in markdown.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+
+        if line.startswith("[[CODE_BLOCK_"):
+            idx = int(re.search(r"\[\[CODE_BLOCK_(\d+)\]\]", line).group(1))
+            add_code_block(doc, code_blocks[idx])
+            continue
+
+        if line.startswith("### "):
+            doc.add_heading(line[4:], level=2)
+        elif line.startswith("## ") or line.startswith("#### "):
+            doc.add_heading(line[3:], level=1)
+        elif line.startswith("- "):
+            add_formatted_paragraph(doc, line[2:], style='List Bullet')
+        else:
+            add_formatted_paragraph(doc, line)
+
+def add_formatted_paragraph(doc, text, style=None):
+    paragraph = doc.add_paragraph(style=style)
+
+    if text.startswith("<img"):
+        run = paragraph.add_run(text)
+        run.font.highlight_color = WD_COLOR_INDEX.YELLOW
+        return
+
+    pattern = re.compile(r"\*\*(.*?)\*\*")
+    pos = 0
+    for match in pattern.finditer(text):
+        before = text[pos:match.start()]
+        bold_text = match.group(1)
+
+        if before:
+            paragraph.add_run(before)
+        bold_run = paragraph.add_run(bold_text)
+        bold_run.bold = True
+        pos = match.end()
+
+    if pos < len(text):
+        paragraph.add_run(text[pos:])
+
+def add_code_block(doc, block_text):
+    for line in block_text.splitlines():
+        p = doc.add_paragraph()
+        run = p.add_run(line)
+        run.font.name = 'Courier New'
+        run.font.highlight_color = WD_COLOR_INDEX.TURQUOISE
+
 
 @app.post("/analyze")
 async def analyze(request: URLRequest):
@@ -140,18 +206,11 @@ async def analyze(request: URLRequest):
         advice = generate_advice(request.url, metrics)
 
         # 📄 Generate .docx
+        # 📄 Generate docx with formatted AI advice only
         doc = Document()
-        doc.add_heading("PSI Optimization Report", 0)
-        doc.add_paragraph(f"URL: {request.url}")
-        doc.add_paragraph("\nMetrics:")
-
-        for key, value in metrics.items():
-            doc.add_paragraph(f"{key}: {value}")
-
-        doc.add_paragraph("\nAI Optimization Advice:")
-        doc.add_paragraph(advice)
-
-        doc_path = "/tmp/psi_advice.docx"
+        parse_markdown_with_code(doc, advice)
+        filename = get_name(request.url) + ".docx"
+        doc_path = f"/tmp/{filename}"
         doc.save(doc_path)
 
         print("✅ Returning docx file")
