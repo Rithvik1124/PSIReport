@@ -4,3 +4,4 @@ selenium
 openai>=1.3.0
 python-multipart
 python-docx
+Pillow
