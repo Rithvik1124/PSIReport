@@ -24,7 +24,7 @@ from docx import Document
 import re
 import datetime
 from docx.enum.text import WD_COLOR_INDEX
-
+import zipfile
 from openai import OpenAI
 import time
 import base64
@@ -79,9 +79,10 @@ def extract_data(driver):
             print(f"⚠️ Could not extract {label}: {e}")
     return data
 
-def screenshot_base64(driver):
-    png = driver.get_screenshot_as_png()
-    return base64.b64encode(png).decode()
+def screenshot_to_pdf_base64(driver, path):
+    png_data = driver.get_screenshot_as_png()
+    image = Image.open(io.BytesIO(png_data)).convert("RGB")
+    image.save(path, "PDF")
 
 def generate_advice(url, data):
     prompt = f"""
@@ -192,6 +193,7 @@ async def analyze(request: URLRequest):
         desktop_driver.get(full_url)
         time.sleep(30)
         curr_url=desktop_driver.current_url
+        screenshot_desktop = screenshot_to_pdf_base64(desktop_driver)
         
         mobile_driver = setup_driver(mobile=True)
         mobile_driver.get(curr_url)
@@ -199,8 +201,7 @@ async def analyze(request: URLRequest):
 
         print("📊 Extracting metrics...")
         metrics = extract_data(desktop_driver)
-        screenshot_desktop = screenshot_base64(desktop_driver)
-        screenshot_mobile = screenshot_base64(mobile_driver)
+        screenshot_mobile = screenshot_to_pdf_base64(mobile_driver)
 
         print("🤖 Getting AI advice...")
         advice = generate_advice(request.url, metrics)
@@ -209,16 +210,17 @@ async def analyze(request: URLRequest):
         # 📄 Generate docx with formatted AI advice only
         doc = Document()
         parse_markdown_with_code(doc, advice)
-        filename = get_name(request.url) + ".docx"
-        doc_path = f"/tmp/{filename}"
+        filename1 = get_name(request.url) + ".docx"
+        doc_path = f"/tmp/{filename1}"
         doc.save(doc_path)
 
         print("✅ Returning docx file")
-        return FileResponse(
-            path=doc_path,
-            filename="psi_advice.docx",
-            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        )
+        zip_path = "/tmp/psi_report_bundle.zip"
+        with zipfile.ZipFile(zip_path, "w") as zipf:
+            zipf.write(doc_path, arcname="psi_advice.docx")
+            zipf.write(pdf_desktop_path, arcname="screenshot_desktop.pdf")
+            zipf.write(pdf_mobile_path, arcname="screenshot_mobile.pdf")
+            return FileResponse(path=zip_path, filename="psi_report_bundle{get_name(request.url)}.zip", media_type="application/zip")
 
     except Exception as e:
         print("🔥 CRITICAL ERROR:", e)
