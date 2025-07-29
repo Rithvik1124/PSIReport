@@ -121,13 +121,15 @@ async def analyze(request: URLRequest):
     full_url = f"https://pagespeed.web.dev/analysis?url={request.url}"
 
     try:
-        desktop_driver = setup_driver(mobile=False)
-        mobile_driver = setup_driver(mobile=True)
-
         print("🚀 Loading PSI...")
+        desktop_driver = setup_driver(mobile=False)
         desktop_driver.get(full_url)
-        mobile_driver.get(full_url)
-        time.sleep(25)  # crude wait for PSI load
+        time.sleep(30)
+        curr_url=desktop_driver.current_url
+        
+        mobile_driver = setup_driver(mobile=True)
+        mobile_driver.get(curr_url)
+        time.sleep(15) 
 
         print("📊 Extracting metrics...")
         metrics = extract_data(desktop_driver)
