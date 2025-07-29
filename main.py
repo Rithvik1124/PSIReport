@@ -229,7 +229,7 @@ async def analyze(request: URLRequest):
         screenshot_to_pdf_base64(desktop_driver,pdf_desktop_path)
 
         print("🤖 Getting AI advice...")
-        advice = generate_advice(request.url, f"Mobile Metrics:{metrics_mob}, Desktop Metrics:{metrics_desk}")
+        advice = generate_advice(request.url, metrics_mob,metrics_desk)
 
         # 📄 Generate .docx
         # 📄 Generate docx with formatted AI advice only
