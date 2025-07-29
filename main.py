@@ -186,6 +186,8 @@ def add_code_block(doc, block_text):
 async def analyze(request: URLRequest):
     print("🌐 Received URL:", request.url)
     full_url = f"https://pagespeed.web.dev/analysis?url={request.url}"
+    desktop_driver = None
+    mobile_driver = None
 
     try:
         print("🚀 Loading PSI...")
