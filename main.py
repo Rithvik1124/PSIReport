@@ -193,7 +193,7 @@ async def analyze(request: URLRequest):
         desktop_driver.get(full_url)
         time.sleep(30)
         curr_url=desktop_driver.current_url
-        screenshot_desktop = screenshot_to_pdf_base64(desktop_driver)
+        screenshot_desktop = screenshot_to_pdf_base64(desktop_driver,"/tmp/screenshot_mobile.pdf")
         
         mobile_driver = setup_driver(mobile=True)
         mobile_driver.get(curr_url)
@@ -201,7 +201,7 @@ async def analyze(request: URLRequest):
 
         print("📊 Extracting metrics...")
         metrics = extract_data(desktop_driver)
-        screenshot_mobile = screenshot_to_pdf_base64(mobile_driver)
+        screenshot_mobile = screenshot_to_pdf_base64(mobile_driver,"/tmp/screenshot_mobile.pdf")
 
         print("🤖 Getting AI advice...")
         advice = generate_advice(request.url, metrics)
