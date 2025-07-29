@@ -83,15 +83,19 @@ def extract_data(driver):
     return data
 
 def screenshot_to_pdf_base64(driver, path):
-    # Get the dimensions of the entire page
+    # Scroll back to top of the page
+    driver.execute_script("window.scrollTo(0, 0);")
+    time.sleep(0.5)
+
+    # Measure full page size
     total_width = driver.execute_script("return document.body.scrollWidth")
     total_height = driver.execute_script("return document.body.scrollHeight")
 
-    # Resize the window to capture the full page
+    # Resize browser to fit entire page
     driver.set_window_size(total_width, total_height)
-    time.sleep(1)  # Give browser time to resize and render
+    time.sleep(1)  # allow time for layout/render
 
-    # Capture and save
+    # Capture screenshot
     png_data = driver.get_screenshot_as_png()
     image = Image.open(io.BytesIO(png_data)).convert("RGB")
     image.save(path, "PDF")
@@ -233,10 +237,12 @@ async def analyze(request: URLRequest):
         time.sleep(15) 
 
         print("📊 Extracting metrics...")
-        screenshot_to_pdf_base64(mobile_driver,pdf_mobile_path)
-        screenshot_to_pdf_base64(desktop_driver,pdf_desktop_path)
         metrics_desk = extract_data(desktop_driver)
+        screenshot_to_pdf_base64(mobile_driver,pdf_mobile_path)
         metrics_mob = extract_data(mobile_driver)
+        screenshot_to_pdf_base64(desktop_driver,pdf_desktop_path)
+        
+        
         
 
         print("🤖 Getting AI advice...")
