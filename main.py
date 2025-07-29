@@ -250,7 +250,7 @@ async def analyze(request: URLRequest):
         print("📦 Verifying ZIP file contents:")
         with zipfile.ZipFile(zip_path, "r") as zipf:
             print("Included files:", zipf.namelist())
-        return FileResponse(path=zip_path, filename=f"psi_report_bundle{get_name(request.url)}.zip", media_type="application/zip")
+        return FileResponse(path=zip_path, filename=f"psi_report_bundle.zip", media_type="application/zip")
 
     except Exception as e:
         print("🔥 CRITICAL ERROR:", e)
