@@ -239,7 +239,7 @@ async def analyze(request: URLRequest):
         time.sleep(30)
         mobile_driver = setup_driver(mobile=True)
         mobile_driver.get(curr_url)
-        time.sleep(15) 
+        time.sleep(30) 
 
         print("📊 Extracting metrics...")
         metrics_desk = extract_data(desktop_driver)
