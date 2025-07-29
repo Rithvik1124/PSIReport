@@ -232,17 +232,16 @@ async def analyze(request: URLRequest):
         return {"error": str(e)}
 
     finally:
-    if desktop_driver:
-        try:
-            desktop_driver.quit()
-        except Exception as e:
-            print("⚠️ Error quitting desktop driver:", e)
-
-    if mobile_driver:
-        try:
-            mobile_driver.quit()
-        except Exception as e:
-            print("⚠️ Error quitting mobile driver:", e)
+        if desktop_driver:
+            try:
+                desktop_driver.quit()
+            except Exception as e:
+                print("⚠️ Error quitting desktop driver:", e)
+        if mobile_driver:
+            try:
+                mobile_driver.quit()
+            except Exception as e:
+                print("⚠️ Error quitting mobile driver:", e)
 @app.get('/')
 def read_root():
     return {"message": "API is live"}
