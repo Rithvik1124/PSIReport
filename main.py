@@ -197,7 +197,6 @@ async def analyze(request: URLRequest):
         desktop_driver.get(full_url)
         time.sleep(30)
         curr_url=desktop_driver.current_url
-        screenshot_desktop = screenshot_to_pdf_base64(desktop_driver,pdf_desktop_path)
         
         mobile_driver = setup_driver(mobile=True)
         mobile_driver.get(curr_url)
@@ -206,7 +205,8 @@ async def analyze(request: URLRequest):
         print("📊 Extracting metrics...")
         metrics_desk = extract_data(desktop_driver)
         metrics_mob = extract_data(mobile_driver)
-        screenshot_mobile = screenshot_to_pdf_base64(mobile_driver,pdf_mobile_path)
+        screenshot_to_pdf_base64(mobile_driver,pdf_mobile_path)
+        screenshot_to_pdf_base64(desktop_driver,pdf_desktop_path)
 
         print("🤖 Getting AI advice...")
         advice = generate_advice(request.url, f"Mobile Metrics:{metrics_mob}, Desktop Metrics:{metrics_desk}")
@@ -225,15 +225,24 @@ async def analyze(request: URLRequest):
             zipf.write(doc_path, arcname="psi_advice.docx")
             zipf.write(pdf_desktop_path, arcname="screenshot_desktop.pdf")
             zipf.write(pdf_mobile_path, arcname="screenshot_mobile.pdf")
-            return FileResponse(path=zip_path, filename="psi_report_bundle{get_name(request.url)}.zip", media_type="application/zip")
+        return FileResponse(path=zip_path, filename=f"psi_report_bundle{get_name(request.url)}.zip", media_type="application/zip")
 
     except Exception as e:
         print("🔥 CRITICAL ERROR:", e)
         return {"error": str(e)}
 
     finally:
-        desktop_driver.quit()
-        mobile_driver.quit()
+    if desktop_driver:
+        try:
+            desktop_driver.quit()
+        except Exception as e:
+            print("⚠️ Error quitting desktop driver:", e)
+
+    if mobile_driver:
+        try:
+            mobile_driver.quit()
+        except Exception as e:
+            print("⚠️ Error quitting mobile driver:", e)
 @app.get('/')
 def read_root():
     return {"message": "API is live"}
