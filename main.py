@@ -243,9 +243,9 @@ async def analyze(request: URLRequest):
 
         print("📊 Extracting metrics...")
         metrics_desk = extract_data(desktop_driver)
-        screenshot_to_pdf_base64(mobile_driver,pdf_mobile_path)
         metrics_mob = extract_data(mobile_driver)
         screenshot_to_pdf_base64(desktop_driver,pdf_desktop_path)
+        screenshot_to_pdf_base64(mobile_driver,pdf_mobile_path)
         
         
         
