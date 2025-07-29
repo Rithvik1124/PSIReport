@@ -43,7 +43,7 @@ class URLRequest(BaseModel):
 def setup_driver(mobile=False):
     chrome_options = Options()
     chrome_options.add_argument("--headless=new")  # or "--headless"
-    chrome_options.add_argument("--window-size=1280,1000")
+    chrome_options.add_argument("--window-size=1000,800")
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")  # 👈 Railway-specific
@@ -83,6 +83,15 @@ def extract_data(driver):
     return data
 
 def screenshot_to_pdf_base64(driver, path):
+    # Get the dimensions of the entire page
+    total_width = driver.execute_script("return document.body.scrollWidth")
+    total_height = driver.execute_script("return document.body.scrollHeight")
+
+    # Resize the window to capture the full page
+    driver.set_window_size(total_width, total_height)
+    time.sleep(1)  # Give browser time to resize and render
+
+    # Capture and save
     png_data = driver.get_screenshot_as_png()
     image = Image.open(io.BytesIO(png_data)).convert("RGB")
     image.save(path, "PDF")
