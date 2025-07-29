@@ -86,23 +86,41 @@ def screenshot_to_pdf_base64(driver, path):
     image = Image.open(io.BytesIO(png_data)).convert("RGB")
     image.save(path, "PDF")
 
-def generate_advice(url, data):
+def generate_advice(url, data_mob,data_desk):
     prompt = f"""
-Act like a web performance consultant for this Shopify site:
-URL: {url}
+Act like an expert web performance consultant. I am running a Shopify website and I am a novice developer
+who is not experienced with SEO or performance optimization. I will paste the output from a PageSpeed Insights report.
+Go through the results and give me a structured improvement plan:
+Audit Data (Mobile):
+- Performance Score: {data_mob.get('Performance Score')}
+- Accessibility: {data_mob.get('Accessibility')}
+- Best Practices: {data_mob.get('BP')}
+- SEO: {data_mob.get('SEO')}
+- LCP: {data_mob.get('LCP')}
+- CLS: {data_mob.get('CLS')}
+- Speed Index: {data_mob.get('SI')}
+- TBT: {data_mob.get('TBT')}
+- FCP: {data_mob.get('FCP')}
+- Diagnostics: {data_mob.get('Diagnostics')}
+- Insights: {data_mob.get('Insights')}
 
-Audit Data:
-- Performance Score: {data.get('Performance Score')}
-- Accessibility: {data.get('Accessibility')}
-- Best Practices: {data.get('BP')}
-- SEO: {data.get('SEO')}
-- LCP: {data.get('LCP')}
-- CLS: {data.get('CLS')}
-- Speed Index: {data.get('SI')}
-- TBT: {data.get('TBT')}
-- FCP: {data.get('FCP')}
-- Diagnostics: {data.get('Diagnostics')}
-- Insights: {data.get('Insights')}
+Audit Data (Desktop):
+- Performance Score: {data_desk.get('Performance Score')}
+- Accessibility: {data_desk.get('Accessibility')}
+- Best Practices: {data_desk.get('BP')}
+- SEO: {data_desk.get('SEO')}
+- LCP: {data_desk.get('LCP')}
+- CLS: {data_desk.get('CLS')}
+- Speed Index: {data_desk.get('SI')}
+- TBT: {data_desk.get('TBT')}
+- FCP: {data_desk.get('FCP')}
+- Diagnostics: {data_desk.get('Diagnostics')}
+- Insights: {data_desk.get('Insights')}
+Break it down by category: Performance, Accessibility, Best Practices, SEO. Explain what the issue is in plain English.
+Tell me why it matters and exactly how to fix it. Include examples of the code changes, server headers, or settings to adjust.
+Don't assume I know SEO or Core Web Vitals—spell out every step.
+
+URL: {url}
 
 Give a detailed, plain-English optimization plan for Performance, Accessibility, SEO, and Best Practices.
 Explain what’s wrong and exactly how to fix it.
