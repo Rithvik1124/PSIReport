@@ -50,7 +50,7 @@ def setup_driver(mobile=False):
     chrome_options.binary_location = "/usr/bin/chromium"
 
     if mobile:
-        chrome_options.add_experimental_option("mobileEmulation", {"deviceName": "Pixel 2"})
+        chrome_options.add_experimental_option("mobileEmulation", {"deviceName": "Pixel 2"})        
 
     service = Service("/usr/bin/chromedriver")
     return webdriver.Chrome(service=service, options=chrome_options)
@@ -207,6 +207,7 @@ def add_formatted_paragraph(doc, text, style=None):
 
     if pos < len(text):
         paragraph.add_run(text[pos:])
+    
 
 def add_code_block(doc, block_text):
     for line in block_text.splitlines():
@@ -222,16 +223,19 @@ async def analyze(request: URLRequest):
     full_url = f"https://pagespeed.web.dev/analysis?url={request.url}"
     desktop_driver = None
     mobile_driver = None
-
     try:
         pdf_desktop_path="/tmp/screenshot_desktop.pdf"
         pdf_mobile_path="/tmp/screenshot_mobile.pdf"
         print("🚀 Loading PSI...")
-        desktop_driver = setup_driver(mobile=False)
-        desktop_driver.get(full_url)
-        time.sleep(30)
-        curr_url=desktop_driver.current_url
+        get_url_driver=setup_driver(mobile=False)
+        get_url_driver.get(full_url)
+        time.sleep(15)
         
+        
+        curr_url=get_url_driver.current_url
+        desktop_driver = setup_driver(mobile=False)
+        desktop_driver.get(curr_url)
+        time.sleep(30)
         mobile_driver = setup_driver(mobile=True)
         mobile_driver.get(curr_url)
         time.sleep(15) 
