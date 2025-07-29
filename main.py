@@ -43,6 +43,7 @@ class URLRequest(BaseModel):
 def setup_driver(mobile=False):
     chrome_options = Options()
     chrome_options.add_argument("--headless=new")  # or "--headless"
+    chrome_options.add_argument("--window-size=1280,1000")
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")  # 👈 Railway-specific
@@ -223,10 +224,11 @@ async def analyze(request: URLRequest):
         time.sleep(15) 
 
         print("📊 Extracting metrics...")
-        metrics_desk = extract_data(desktop_driver)
-        metrics_mob = extract_data(mobile_driver)
         screenshot_to_pdf_base64(mobile_driver,pdf_mobile_path)
         screenshot_to_pdf_base64(desktop_driver,pdf_desktop_path)
+        metrics_desk = extract_data(desktop_driver)
+        metrics_mob = extract_data(mobile_driver)
+        
 
         print("🤖 Getting AI advice...")
         advice = generate_advice(request.url, metrics_mob,metrics_desk)
