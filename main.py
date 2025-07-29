@@ -230,6 +230,8 @@ async def analyze(request: URLRequest):
 
         print("🤖 Getting AI advice...")
         advice = generate_advice(request.url, metrics_mob,metrics_desk)
+        print("📝 AI advice content (first 300 chars):")
+        print(advice[:300] if advice else "No advice returned")
 
         # 📄 Generate .docx
         # 📄 Generate docx with formatted AI advice only
@@ -245,6 +247,9 @@ async def analyze(request: URLRequest):
             zipf.write(doc_path, arcname="psi_advice.docx")
             zipf.write(pdf_desktop_path, arcname="screenshot_desktop.pdf")
             zipf.write(pdf_mobile_path, arcname="screenshot_mobile.pdf")
+        print("📦 Verifying ZIP file contents:")
+        with zipfile.ZipFile(zip_path, "r") as zipf:
+            print("Included files:", zipf.namelist())
         return FileResponse(path=zip_path, filename=f"psi_report_bundle{get_name(request.url)}.zip", media_type="application/zip")
 
     except Exception as e:
