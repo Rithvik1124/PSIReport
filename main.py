@@ -223,6 +223,7 @@ async def analyze(request: URLRequest):
     full_url = f"https://pagespeed.web.dev/analysis?url={request.url}"
     desktop_driver = None
     mobile_driver = None
+    get_url_driver = None
     try:
         pdf_desktop_path="/tmp/screenshot_desktop.pdf"
         pdf_mobile_path="/tmp/screenshot_mobile.pdf"
@@ -286,6 +287,11 @@ async def analyze(request: URLRequest):
         if mobile_driver:
             try:
                 mobile_driver.quit()
+            except Exception as e:
+                print("⚠️ Error quitting mobile driver:", e)
+        if get_url_driver:
+            try:
+                get_url_driver.quit()
             except Exception as e:
                 print("⚠️ Error quitting mobile driver:", e)
 @app.get('/')
