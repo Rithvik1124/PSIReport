@@ -25,6 +25,8 @@ import re
 import datetime
 from docx.enum.text import WD_COLOR_INDEX
 import zipfile
+from PIL import Image
+import io
 from openai import OpenAI
 import time
 import base64
